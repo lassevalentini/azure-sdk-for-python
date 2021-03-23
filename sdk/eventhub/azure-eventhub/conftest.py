@@ -9,6 +9,7 @@ import pytest
 import logging
 import uuid
 import warnings
+import datetime
 from logging.handlers import RotatingFileHandler
 
 from azure.identity import EnvironmentCredential
@@ -18,6 +19,7 @@ from azure.eventhub import EventHubProducerClient
 from uamqp import ReceiveClient
 from uamqp.authentication import SASTokenAuth
 
+from devtools_testutils import get_region_override
 
 # Ignore async tests for Python < 3.5
 collect_ignore = []
@@ -32,7 +34,7 @@ RES_GROUP_PREFIX = "eh-res-group"
 NAMESPACE_PREFIX = "eh-ns"
 EVENTHUB_PREFIX = "eh"
 EVENTHUB_DEFAULT_AUTH_RULE_NAME = 'RootManageSharedAccessKey'
-LOCATION = "westus"
+LOCATION = get_region_override("westus")
 
 
 def pytest_addoption(parser):
@@ -81,9 +83,13 @@ def resource_group():
         return
     resource_client = ResourceManagementClient(EnvironmentCredential(), SUBSCRIPTION_ID)
     resource_group_name = RES_GROUP_PREFIX + str(uuid.uuid4())
+    parameters = {"location": LOCATION}
+    expiry = datetime.datetime.utcnow() + datetime.timedelta(days=1)
+    parameters['tags'] = {'DeleteAfter': expiry.replace(microsecond=0).isoformat()}
     try:
         rg = resource_client.resource_groups.create_or_update(
-           resource_group_name, {"location": LOCATION}
+            resource_group_name,
+            parameters
         )
         yield rg
     finally:
